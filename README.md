@@ -62,6 +62,7 @@ The following is an example Collectd configuration for this plugin:
             User ""
             Password "password"
             Database "admin" "db-prod" "db-dev"
+			Collections "db-prod:collection" "db-dev:other-collection"
 
             UseTLS true
 

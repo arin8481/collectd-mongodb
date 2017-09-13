@@ -13,6 +13,7 @@ class MongoDB(object):
         self.mongo_host = "127.0.0.1"
         self.mongo_port = None
         self.mongo_db = ["admin", ]
+        self.mongo_colls = []
         self.mongo_user = None
         self.mongo_password = None
         self.mongo_version = None
@@ -25,7 +26,7 @@ class MongoDB(object):
         self.ssl_client_key_path = None
         self.ssl_client_key_passphrase = None
 
-    def submit(self, type, type_instance, value, db=None):
+    def submit(self, type, type_instance, value, db=None, coll=None):
         v = collectd.Values()
         v.plugin = self.plugin_name
 
@@ -37,6 +38,9 @@ class MongoDB(object):
             discovered_dims = 'cluster=%s' % self.cluster_name
         elif db is not None:
             discovered_dims = 'db=%s' % db
+
+        if coll is not None:
+            discovered_dims = 'collection=%s' % coll
 
         # set plugin_instance
         if self.dimensions is not None and discovered_dims is not None:
@@ -290,6 +294,22 @@ class MongoDB(object):
             self.submit('gauge', 'dataSize',
                         db_stats['dataSize'], mongo_db)
 
+            # collection stats counts
+            for mongo_coll in self.mongo_colls:
+                db_name, coll_name = mongo_coll.split(":")
+                if db_name == mongo_db:
+                    coll = db[coll_name]
+                    if coll is None:
+                        continue
+
+                    coll_stats = coll.command('collstats')
+                    self.submit('gauge', 'documents',
+                        coll_stats['count'], mongo_db, coll)
+                    self.submit('gauge', 'storageSize',
+                        coll_stats['storageSize'], mongo_db, coll)
+                    self.submit('gauge', 'indexSize',
+                        coll_stats['totalIndexSize'], mongo_db, coll)
+
         # repl operations
         if 'opcountersRepl' in server_status:
             for k, v in server_status['opcountersRepl'].items():
@@ -324,6 +344,8 @@ class MongoDB(object):
                 self.ssl_client_key_path = node.values[0]
             elif node.key == 'TLSClientKeyPassphrase':
                 self.ssl_client_key_passphrase = node.values[0]
+            elif node.key == 'Collections'
+                self.mongo_colls = node.values
             else:
                 self.log("Unknown configuration key %s" % node.key)
 
